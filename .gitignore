@@ -1,0 +1,19 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Editor
+.vscode/
+.idea/
+
+# Build artifacts
+*.bin
+*.elf
+*.map
+
+# macOS
+.DS_Store
+
+# Local Wi-Fi / OTA credentials -- never commit
+src/secrets.h
