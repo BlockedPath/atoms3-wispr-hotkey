@@ -17,3 +17,9 @@
 
 # Local Wi-Fi / OTA credentials -- never commit
 src/secrets.h
+
+# Documentation
+IDEAS.MD
+INVENTORY.MD
+docs/9v-gauge-wiring.png
+docs/9v-gauge-wiring.svg
