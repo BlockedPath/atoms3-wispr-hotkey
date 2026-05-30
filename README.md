@@ -1,165 +1,250 @@
-# assclets — AtomS3 Wispr Flow push-to-talk button
+# assclets
 
-Turns an **M5Stack AtomS3** into a hardware **push-to-talk** button for
-[Wispr Flow](https://wisprflow.ai) on macOS.
+Firmware for turning an **M5Stack AtomS3** into a hardware push-to-talk button
+for [Wispr Flow](https://wisprflow.ai) on macOS.
 
-Hold the screen → the AtomS3 holds **Ctrl+Option** down over Bluetooth → Wispr
-Flow records the mic. Release → the keys let go → Wispr transcribes and inserts
-the text where your cursor is.
+Hold the AtomS3 screen button and the device holds **Ctrl+Option** over
+Bluetooth LE HID. Release the button and the keys are released. Wispr Flow uses
+that shortcut to record while held, then transcribes into the focused text field.
 
-The whole front LCD of the AtomS3 is a button (GPIO41), so you literally press
-the screen in to talk.
+## What You Need
 
-## Hardware
-
-- **M5Stack AtomS3** (ESP32-S3, 0.85" LCD). USB-C for power/flashing.
+- M5Stack AtomS3 with the 0.85 inch screen.
+- USB-C cable for power and first flash.
 - A Mac with Bluetooth and Wispr Flow installed.
+- Python 3 and PlatformIO.
 
-> The AtomS3 has no battery, so it stays plugged in for power. It talks to the
-> Mac over **Bluetooth LE** (the ESP32-S3 has no Bluetooth Classic, which is
-> fine — macOS supports BLE HID keyboards).
+The AtomS3 does not have a built-in battery. It should stay plugged into USB for
+power unless you add your own external supply.
 
-## Build & flash
+## Install PlatformIO
 
-Requires [PlatformIO](https://platformio.org/install) (`pip install platformio`
-or the VS Code extension). All library/core versions are pinned in
-`platformio.ini`, so the build is reproducible.
-
-First, set up your Wi-Fi/OTA credentials (git-ignored, never committed):
+Install PlatformIO with one of these options:
 
 ```bash
-cp src/secrets.h.example src/secrets.h   # then edit src/secrets.h
+python3 -m pip install --user platformio
 ```
 
-Then build and flash over USB-C:
+Or install the PlatformIO extension in VS Code.
+
+Confirm the command works:
 
 ```bash
-pio run                 # compile
-pio run -t upload       # flash over USB-C
-pio device monitor      # (optional) view boot/serial logs at 115200
+pio --version
 ```
 
-### Wireless updates (Wi-Fi OTA)
+## Get The Firmware
 
-Once the firmware is on the device and it has joined your Wi-Fi, you can flash
-**without a cable** — the small dot in the top-right of the screen turns green
-when OTA is ready:
+Clone this repo and enter it:
 
 ```bash
-pio run -e atoms3-ota -t upload     # flashes to atom-hotkey.local over Wi-Fi
+git clone https://github.com/BlockedPath/atoms3-wispr-hotkey.git
+cd atoms3-wispr-hotkey
 ```
 
-The hostname (`atom-hotkey`) is set by `OTA_HOSTNAME` in `secrets.h` and matched
-by `upload_port` in `platformio.ini`. Set `OTA_PASSWORD` (and `--auth` in the OTA
-env) if you want it password-protected.
+If you forked the project, use your fork URL instead.
 
-## Pair with macOS
+## Create Your Local Secrets File
 
-1. After flashing, the screen shows **PAIR**.
-2. macOS **System Settings → Bluetooth** → connect **"AtomS3 Hotkey"**.
-   - If the *Keyboard Setup Assistant* pops up, just close it.
-3. Once connected the screen shows **READY**.
+The firmware includes Wi-Fi OTA support, so it needs local Wi-Fi settings at
+build time. Copy the example file:
+
+```bash
+cp src/secrets.h.example src/secrets.h
+```
+
+Edit `src/secrets.h`:
+
+```cpp
+#define WIFI_SSID     "your-wifi-name"
+#define WIFI_PASS     "your-wifi-password"
+
+#define OTA_HOSTNAME  "atom-hotkey"
+#define OTA_PASSWORD  ""
+```
+
+`src/secrets.h` is intentionally ignored by Git. Do not commit your Wi-Fi
+password.
+
+## Build And Flash Over USB
+
+Plug the AtomS3 into your Mac with USB-C, then build:
+
+```bash
+pio run
+```
+
+Flash the firmware:
+
+```bash
+pio run -t upload
+```
+
+Optional serial logs:
+
+```bash
+pio device monitor
+```
+
+After flashing, the AtomS3 screen should show `PAIR`.
+
+## Pair With macOS
+
+1. Open macOS System Settings.
+2. Go to Bluetooth.
+3. Connect to `AtomS3 Hotkey`.
+4. If Keyboard Setup Assistant opens, close it.
+
+When pairing succeeds, the AtomS3 screen changes from `PAIR` to `READY`.
 
 ## Configure Wispr Flow
 
-**Wispr Flow → Settings → General → Shortcuts → Push-to-talk → set to
-`Ctrl+Option`** (hold both, the firmware sends exactly this).
+In Wispr Flow, set push-to-talk to the same shortcut the firmware sends:
 
-> Wispr's push-to-talk requires a *modifier* combo — lone keys and bare F-keys
-> are blocked. `Ctrl+Option` is Wispr's own recommended combo.
+```text
+Settings -> General -> Shortcuts -> Push-to-talk -> Ctrl+Option
+```
 
-## Use
+Wispr requires a modifier shortcut for push-to-talk. This firmware sends exactly
+left Control plus left Option.
 
-Focus any text field, then:
+## Use The Button
 
-| Gesture | Action |
-|---------|--------|
-| **Press & hold** | Talk while held (push-to-talk); release to transcribe |
-| **Double-tap** | **Lock** recording on (hands-free) — keeps Ctrl+Option held |
-| **Tap** (while locked) | Stop & transcribe |
+| Gesture | Result |
+| --- | --- |
+| Press and hold | Talk while held |
+| Release after hold | Stop recording and transcribe |
+| Double-tap | Lock recording on for hands-free dictation |
+| Tap while locked | Stop locked recording and transcribe |
 
-Wispr needs about a 1-second minimum, so quick taps don't dictate.
+Screen states:
 
-Screen states: **PAIR** (waiting for Bluetooth) · **READY** (connected, idle) ·
-a live **M:SS recording timer** while held ("listening") or latched ("tap to
-stop", on a dark-red background for hands-free). When idle after a clip, the
-screen reports its length (e.g. **last 0:12**) so a glance confirms the
-dictation registered. A green dot top-right means Wi-Fi OTA is ready, and a
-small battery badge appears to its left **only when a 9V pack is wired in** (see
-[Optional: 9V battery gauge](#optional-9v-battery-gauge)) — on USB power it stays
-hidden.
+| State | Meaning |
+| --- | --- |
+| `PAIR` | Waiting for Bluetooth connection |
+| `READY` | Connected and idle |
+| `M:SS` with `listening` | Recording while held |
+| `M:SS` with `tap to stop` | Locked recording is active |
+| `last M:SS` | Length of the most recent recording |
 
-> A press must last ~250 ms to count as a hold (vs. a tap) — this is how the
-> firmware tells push-to-talk from a double-tap. Tune `kHoldMs` / `kDoubleTapMs`
-> in `include/AppConfig.h` to taste.
+Wispr may ignore very short clips. Hold for about one second or longer.
 
-## Project layout
+## Wireless OTA Updates
 
-The firmware is split by responsibility so new features can be added without
-turning `loop()` into a large state blob:
+After the first USB flash, future updates can be sent over Wi-Fi if the AtomS3
+is on the same network and the OTA dot on the screen is green.
+
+The default OTA target is `atom-hotkey.local`, matching `OTA_HOSTNAME` in
+`src/secrets.h` and `upload_port` in `platformio.ini`.
+
+Flash over Wi-Fi:
+
+```bash
+pio run -e atoms3-ota -t upload
+```
+
+If you change `OTA_HOSTNAME`, also update `upload_port` in the `atoms3-ota`
+environment in `platformio.ini`.
+
+## Customize The Device
+
+Common settings live in `include/AppConfig.h`:
+
+| Setting | Purpose |
+| --- | --- |
+| `kBleDeviceName` | Bluetooth device name shown in macOS |
+| `kHoldMs` | Press duration needed before hold-to-talk starts |
+| `kDoubleTapMs` | Max time between taps for locked recording |
+| `kRecordingFrameMs` | Display animation update interval |
+| `kWifiRetryMs` | Wi-Fi reconnect retry interval |
+
+If you rename `kBleDeviceName`, remove the old Bluetooth device in macOS and
+pair again.
+
+## Optional 9V Battery Gauge
+
+The battery badge is disabled by default. Leave it disabled unless you wire a
+resistor divider from a 9V battery pack to GPIO8.
+
+Divider:
+
+```text
+9V (+) -- R1 330k --+-- R2 100k -- GND
+                    |
+                    +-- G8 / GPIO8 on AtomS3
+```
+
+Important safety checks:
+
+- AtomS3 ground and battery ground must be shared.
+- Use GPIO8 because it is on ADC1. ADC2 conflicts with Wi-Fi on ESP32.
+- Before connecting GPIO8, measure the divider midpoint with a multimeter.
+- A fresh 9V battery should read about 2.2V at the midpoint.
+- If the midpoint reads raw battery voltage, do not connect it to GPIO8.
+
+After wiring and verifying the divider, enable the gauge by adding this build
+flag in `platformio.ini`:
+
+```ini
+build_flags =
+    -DUSE_NIMBLE
+    -DASSCLETS_BATTERY_GAUGE=1
+```
+
+On USB power or a normal USB power bank, keep the gauge disabled. A regulated 5V
+USB supply does not expose battery state to the AtomS3.
+
+## What Should Not Be In GitHub
+
+These ignored files are local-only and are not needed in the GitHub repo for
+another user to install the firmware:
+
+| Ignored path | Why it should stay out of Git |
+| --- | --- |
+| `.pio/`, `.pioenvs/`, `.piolibdeps/` | PlatformIO build outputs and downloaded libraries |
+| `*.bin`, `*.elf`, `*.map` | Generated firmware artifacts |
+| `.vscode/`, `.idea/` | Local editor settings |
+| `.DS_Store` | macOS Finder metadata |
+| `src/secrets.h` | User-specific Wi-Fi and OTA credentials |
+
+Users do need a `src/secrets.h` locally, but they should generate it from
+`src/secrets.h.example` after cloning.
+
+## Troubleshooting
+
+If PlatformIO cannot find the board, update PlatformIO:
+
+```bash
+pio upgrade
+pio pkg update
+```
+
+If macOS will not reconnect, remove `AtomS3 Hotkey` from Bluetooth settings and
+pair again.
+
+If Wispr does not start recording, verify the shortcut in Wispr is set to
+`Ctrl+Option`. You can also use Karabiner-Elements EventViewer or the macOS
+Accessibility Keyboard to confirm Control and Option are held while pressing the
+AtomS3 screen.
+
+If OTA upload fails, flash once over USB again and confirm the device is on the
+same Wi-Fi network as your Mac.
+
+If you get build errors around BLE or NimBLE, do not upgrade the pinned platform
+or libraries casually. `platformio.ini` intentionally uses ESP32 Arduino core
+2.0.x with NimBLE 1.4.x because the BLE keyboard library is not compatible with
+all newer core/library combinations.
+
+## Project Layout
 
 | Path | Responsibility |
-|------|----------------|
-| `src/main.cpp` | Arduino `setup()` / `loop()` glue |
-| `src/app/HotkeyController.*` | BLE hotkey state machine and button gestures |
-| `src/hardware/DisplayView.*` | LCD rendering |
-| `src/hardware/BatteryMonitor.*` | Optional 9V ADC battery gauge |
-| `src/hardware/OtaService.*` | Wi-Fi retry + OTA service |
+| --- | --- |
+| `src/main.cpp` | Arduino `setup()` and `loop()` glue |
+| `src/app/HotkeyController.*` | Button gestures, BLE HID state, recording modes |
+| `src/hardware/DisplayView.*` | LCD drawing |
+| `src/hardware/OtaService.*` | Wi-Fi retry and ArduinoOTA handling |
+| `src/hardware/BatteryMonitor.*` | Optional battery gauge sampling |
 | `include/AppConfig.h` | Device constants and compile-time flags |
+| `src/secrets.h.example` | Template for local Wi-Fi and OTA config |
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the boundaries and design
-rules.
-
-## Optional: 9V battery gauge
-
-The AtomS3 has no fuel gauge, so a dumb supply (USB power bank, **HW-131**
-breadboard PSU with a 9V battery, etc.) is electrically invisible — it just
-provides 5V. To show a battery % badge, tap the **raw 9V** through a resistor
-divider into an ADC pin. On a breadboard (e.g. the HW-131) this is solderless.
-
-```
- 9V (+) ──[ R1 = 330k ]──┬──[ R2 = 100k ]── GND     ← shared GND with the AtomS3
-                         │
-                         └──────────────────────────→ G8 / GPIO8  (AtomS3, ADC1)
-```
-
-- **Off by default.** Add `-DASSCLETS_BATTERY_GAUGE=1` to `build_flags` in
-  `platformio.ini` *after* wiring the divider — otherwise the floating ADC pin
-  shows a meaningless "phantom" %. A USB power bank can't be gauged (regulated
-  5V, no telemetry), so leave it disabled for power-bank/USB use.
-- Divider ratio `R2/(R1+R2) = 0.233` keeps a fresh ~9.6V cell at ~2.2V on the
-  pin — safely under the 3.3V ADC limit. `kBatteryDivider`, `kBatteryFullMv`,
-  `kBatteryEmptyMv` in `include/AppConfig.h` tune the curve (defaults are
-  alkaline-9V).
-- **G8/GPIO8 is on ADC1 deliberately** — ADC2 is shared with the Wi-Fi radio and
-  reads fail while Wi-Fi/OTA is up.
-- ⚠️ **Before connecting GPIO8:** build the divider and measure the midpoint with
-  a multimeter against a fresh battery — expect **~2.2V**. If it reads ~9V the
-  divider is reversed; wiring it to GPIO8 would destroy the pin. This
-  measurement is the safety gate; firmware can't protect against a miswire.
-- The badge auto-hides when no pack is detected (`< 4.5V` at the divider).
-
-## Notes & troubleshooting
-
-- **~1 second minimum hold** — quick taps do nothing (this is Wispr's behavior).
-- **Verify the raw hotkey** (before wiring up Wispr): open Karabiner-Elements →
-  EventViewer, or the macOS *Accessibility Keyboard*
-  (System Settings → Accessibility → Keyboard), and confirm `⌃` + `⌥` light up
-  while held and clear on release.
-- **Stuck modifiers:** the firmware clears Ctrl+Option on every fresh BLE
-  connect, so a hold interrupted by sleep/disconnect can't leave them latched.
-- **Won't reconnect after sleep/reboot:** toggle Bluetooth, or remove the
-  device in Bluetooth settings and re-pair.
-- **Build errors about NimBLE:** make sure `NimBLE-Arduino` resolved to a
-  **1.4.x** (not 2.x) and that the platform is `espressif32@6.9.0` (ESP32 core
-  2.0.x). See comments in `platformio.ini`.
-
-## Ideas / roadmap
-
-See [`IDEAS.md`](IDEAS.md) for a ranked backlog of features to add (mute toggle,
-mode switcher, IMU gestures, media keys, macropad, etc.), plus the hardware
-capabilities and constraints.
-
-## Rename the device
-
-Change `kBleDeviceName` in `include/AppConfig.h`.
+See `docs/ARCHITECTURE.md` for the internal design rules.
