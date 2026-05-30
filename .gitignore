@@ -13,6 +13,12 @@ compile_commands.json
 *.elf
 *.map
 *.md
+!CODE_OF_CONDUCT.md
+!CONTRIBUTING.md
+!.github/
+!.github/ISSUE_TEMPLATE/
+!.github/ISSUE_TEMPLATE/*.md
+!.github/pull_request_template.md
 # macOS
 .DS_Store
 
