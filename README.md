@@ -1,4 +1,4 @@
-# assclets
+# atoms3-wispr-hotkey
 
 Firmware for turning an **M5Stack AtomS3** into a hardware push-to-talk button
 for [Wispr Flow](https://wisprflow.ai) on macOS.
