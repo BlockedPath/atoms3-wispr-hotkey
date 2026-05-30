@@ -41,6 +41,35 @@ uint32_t pressStart = 0;
 uint32_t lastTapMs  = 0;
 bool     pendingTap = false;
 
+// ---- live status ----------------------------------------------------------
+// The LCD doubles as a live status readout for Wispr: a recording timer counts
+// up while the combo is held, and the idle screen reports the last clip length
+// so a glance confirms the dictation registered (Wispr needs ~1s minimum).
+uint32_t recStartMs = 0;   // millis() when the current recording began
+uint32_t lastClipMs = 0;   // length of the most recent finished clip (0 = none yet)
+
+// ---- battery monitor (optional 9V pack via HW-131) ------------------------
+// OFF by default: the badge only makes sense once the divider below is wired.
+// A USB power bank (or any regulated 5V supply) can't be gauged -- it holds 5V
+// until nearly dead -- so leave this 0 unless you've built the 9V tap, or the
+// floating ADC pin will show a meaningless "phantom" percentage.
+#define BATTERY_GAUGE 0
+//
+// The AtomS3 itself has no fuel gauge, so a dumb 9V supply is invisible to it.
+// To read one, tap the raw 9V through a resistor divider into an ADC pin:
+//   9V(+) --[ R1=330k ]--+--[ R2=100k ]-- GND        (share GND with the AtomS3)
+//                        |
+//                        +--> G8 / GPIO8  (ADC1, exposed on the AtomS3)
+// vbat = pin_mV * (R1+R2)/R2.  A coarse % comes from the alkaline 9V curve.
+// When no pack is present (USB power), the divider midpoint sits near 0V, so we
+// read < BAT_PRESENT_MV and simply hide the badge.
+const int   BAT_ADC_PIN    = 8;       // G8 / GPIO8 (ADC1_CH7)
+const float BAT_DIVIDER    = 4.3f;    // (R1+R2)/R2 for R1=330k, R2=100k
+const int   BAT_FULL_MV    = 9000;    // ~100% (alkaline 9V under light load)
+const int   BAT_EMPTY_MV   = 6000;    // ~0%   (effectively flat)
+const int   BAT_PRESENT_MV = 4500;    // below this = no pack attached (on USB)
+int batPct = -1;                      // -1 = no battery detected (badge hidden)
+
 // ---- LCD UI (128x128 IPS), drawn flicker-free via an off-screen canvas -----
 M5Canvas canvas(&M5.Display);
 uint16_t C_BG, C_BG_REC, C_TITLE, C_SUB, C_GREEN, C_RED, C_BLUE;
@@ -87,6 +116,20 @@ static void renderScreen(const char* title, const char* subtitle, uint16_t accen
   canvas.setTextColor(C_SUB);
   canvas.drawString(subtitle, cx, 110);
 
+  // Battery badge (top-right, just left of the OTA dot). Only shown when a 9V
+  // pack is detected on the ADC pin; on USB power it stays hidden.
+  if (batPct >= 0) {
+    const int bw = 18, bh = 10, bx = 88, by = 4;
+    const uint16_t bc = (batPct > 20) ? C_GREEN : C_RED;
+    canvas.drawRect(bx, by, bw, bh, C_SUB);                              // outline
+    canvas.fillRect(bx + bw, by + 3, 2, bh - 6, C_SUB);                 // + terminal nub
+    canvas.fillRect(bx + 2, by + 2, (bw - 4) * batPct / 100, bh - 4, bc); // charge fill
+    canvas.setFont(&fonts::Font0);
+    canvas.setTextDatum(middle_right);
+    canvas.setTextColor(C_SUB);
+    canvas.drawString((String(batPct) + "%").c_str(), bx - 4, by + bh / 2);
+  }
+
   // Tiny corner dot: green when Wi-Fi OTA is ready, dim otherwise.
   canvas.fillCircle(canvas.width() - 9, 9, 3, otaReady ? C_GREEN : C_SUB);
 
@@ -119,18 +162,55 @@ static int pulseRadius() {
   return 16 + (int)(s * 8.0f);
 }
 
-static void drawIdle()         { renderScreen("READY", "hold to talk", C_GREEN, C_BG,     0, 0); }
-static void drawDisconnected() { renderScreen("PAIR",  "bluetooth",    C_BLUE,  C_BG,     0, 0); }
-static void drawPTT()          { renderScreen("REC",   "listening",    C_RED,   C_BG,     1, pulseRadius()); }
-static void drawLocked()       { renderScreen("REC",   "tap to stop",  C_RED,   C_BG_REC, 2, pulseRadius()); }
+// Format a duration in milliseconds as "M:SS" (e.g. 7000 -> "0:07").
+static String fmtMMSS(uint32_t ms) {
+  const uint32_t s = ms / 1000;
+  return String(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + String(s % 60);
+}
+
+static void drawIdle() {
+  // Once we've captured a clip this session, report its length so a glance
+  // confirms the dictation registered; otherwise show the usual prompt.
+  const String sub = lastClipMs ? ("last " + fmtMMSS(lastClipMs)) : String("hold to talk");
+  renderScreen("READY", sub.c_str(), C_GREEN, C_BG, 0, 0);
+}
+static void drawDisconnected() { renderScreen("PAIR", "bluetooth", C_BLUE, C_BG, 0, 0); }
+// While recording, the live timer is the headline; the subtitle keeps the
+// gesture hint (esp. "tap to stop", the only on-screen way out of hands-free).
+static void drawPTT()    { renderScreen(fmtMMSS(millis() - recStartMs).c_str(), "listening",   C_RED, C_BG,     1, pulseRadius()); }
+static void drawLocked() { renderScreen(fmtMMSS(millis() - recStartMs).c_str(), "tap to stop", C_RED, C_BG_REC, 2, pulseRadius()); }
+
+// Sample the 9V pack via the ADC divider, map to a coarse %, and (when the
+// value changes) refresh the static screens so the badge updates without
+// needing a state change. REC screens already animate, so they pick it up.
+static void sampleBattery() {
+#if !BATTERY_GAUGE
+  batPct = -1;            // no gauge hardware wired -> keep the badge hidden
+  return;
+#else
+  uint32_t sum = 0;
+  for (int i = 0; i < 8; i++) sum += analogReadMilliVolts(BAT_ADC_PIN);
+  const int vbat = (int)((sum / 8) * BAT_DIVIDER);
+  int pct = (vbat < BAT_PRESENT_MV)
+              ? -1
+              : constrain((vbat - BAT_EMPTY_MV) * 100 / (BAT_FULL_MV - BAT_EMPTY_MV), 0, 100);
+  if (pct == batPct) return;
+  batPct = pct;
+  if (mode == MODE_IDLE) (bleKeyboard.isConnected() ? drawIdle() : drawDisconnected());
+#endif
+}
 
 // ---- key helpers ----------------------------------------------------------
 static void holdCombo()    { bleKeyboard.press(KEY_LEFT_CTRL); bleKeyboard.press(KEY_LEFT_ALT); } // Ctrl+Option
 static void releaseCombo() { bleKeyboard.releaseAll(); }
 
-static void enterIdle()   { releaseCombo(); mode = MODE_IDLE;   pendingTap = false; drawIdle(); }
-static void enterPTT()    { holdCombo();    mode = MODE_PTT;                        drawPTT(); }
-static void enterLocked() { holdCombo();    mode = MODE_LOCKED; pendingTap = false; drawLocked(); }
+static void enterIdle() {
+  // Capture how long the just-ended clip ran (read mode *before* resetting it).
+  if (mode == MODE_PTT || mode == MODE_LOCKED) lastClipMs = millis() - recStartMs;
+  releaseCombo(); mode = MODE_IDLE; pendingTap = false; drawIdle();
+}
+static void enterPTT()    { recStartMs = millis(); holdCombo(); mode = MODE_PTT;                        drawPTT(); }
+static void enterLocked() { recStartMs = millis(); holdCombo(); mode = MODE_LOCKED; pendingTap = false; drawLocked(); }
 
 // ---- Wi-Fi OTA ------------------------------------------------------------
 // Kept non-blocking: we start Wi-Fi, then bring OTA up lazily once connected,
@@ -171,8 +251,11 @@ void setup() {
   canvas.setTextWrap(false);
   initColors();
 
+  analogSetPinAttenuation(BAT_ADC_PIN, ADC_11db);  // full ~0-3.3V range on G8
+
   bleKeyboard.begin();           // start BLE HID advertising (primary function)
   startWifi();                   // bring up Wi-Fi + OTA in the background
+  sampleBattery();               // detect a 9V pack before the first draw
   drawDisconnected();
 }
 
@@ -181,6 +264,10 @@ void loop() {
   serviceOta();                 // handle Wi-Fi OTA (works even when BLE is unpaired)
   const uint32_t now = millis();
   const bool connected = bleKeyboard.isConnected();
+
+  // Poll the optional 9V pack every 5s (slow-moving; ADC noise averaged out).
+  static uint32_t lastBat = 0;
+  if (now - lastBat >= 5000) { lastBat = now; sampleBattery(); }
 
   // Connection edges. Clearing the combo on every (re)connect prevents
   // Ctrl+Option from being left latched on the Mac across a sleep/disconnect.

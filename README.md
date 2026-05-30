@@ -81,12 +81,45 @@ Focus any text field, then:
 Wispr needs about a 1-second minimum, so quick taps don't dictate.
 
 Screen states: **PAIR** (waiting for Bluetooth) · **READY** (connected, idle) ·
-**REC** "listening" (held) · **REC** "tap to stop" on a dark-red background
-(locked / hands-free). A green dot top-right means Wi-Fi OTA is ready.
+a live **M:SS recording timer** while held ("listening") or latched ("tap to
+stop", on a dark-red background for hands-free). When idle after a clip, the
+screen reports its length (e.g. **last 0:12**) so a glance confirms the
+dictation registered. A green dot top-right means Wi-Fi OTA is ready, and a
+small battery badge appears to its left **only when a 9V pack is wired in** (see
+[Optional: 9V battery gauge](#optional-9v-battery-gauge)) — on USB power it stays
+hidden.
 
 > A press must last ~250 ms to count as a hold (vs. a tap) — this is how the
 > firmware tells push-to-talk from a double-tap. Tune `HOLD_MS` / `DTAP_MS` in
 > `src/main.cpp` to taste.
+
+## Optional: 9V battery gauge
+
+The AtomS3 has no fuel gauge, so a dumb supply (USB power bank, **HW-131**
+breadboard PSU with a 9V battery, etc.) is electrically invisible — it just
+provides 5V. To show a battery % badge, tap the **raw 9V** through a resistor
+divider into an ADC pin. On a breadboard (e.g. the HW-131) this is solderless.
+
+```
+ 9V (+) ──[ R1 = 330k ]──┬──[ R2 = 100k ]── GND     ← shared GND with the AtomS3
+                         │
+                         └──────────────────────────→ G8 / GPIO8  (AtomS3, ADC1)
+```
+
+- **Off by default.** Set `#define BATTERY_GAUGE 1` in `src/main.cpp` *after*
+  wiring the divider — otherwise the floating ADC pin shows a meaningless
+  "phantom" %. A USB power bank can't be gauged (regulated 5V, no telemetry), so
+  leave it `0` for power-bank/USB use.
+- Divider ratio `R2/(R1+R2) = 0.233` keeps a fresh ~9.6V cell at ~2.2V on the
+  pin — safely under the 3.3V ADC limit. `BAT_DIVIDER`, `BAT_FULL_MV`,
+  `BAT_EMPTY_MV` in `src/main.cpp` tune the curve (defaults are alkaline-9V).
+- **G8/GPIO8 is on ADC1 deliberately** — ADC2 is shared with the Wi-Fi radio and
+  reads fail while Wi-Fi/OTA is up.
+- ⚠️ **Before connecting GPIO8:** build the divider and measure the midpoint with
+  a multimeter against a fresh battery — expect **~2.2V**. If it reads ~9V the
+  divider is reversed; wiring it to GPIO8 would destroy the pin. This
+  measurement is the safety gate; firmware can't protect against a miswire.
+- The badge auto-hides when no pack is detected (`< 4.5V` at the divider).
 
 ## Notes & troubleshooting
 
