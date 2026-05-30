@@ -8,6 +8,7 @@
 .idea/
 
 # Build artifacts
+compile_commands.json
 *.bin
 *.elf
 *.map
