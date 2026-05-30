@@ -273,6 +273,6 @@ Two host-side C++ unit tests cover the non-hardware logic paths:
 Run them with:
 
 ```bash
-g++ -std=c++17 -I./src tests/test_button_gesture_tracker.cpp src/app/ButtonGestureTracker.cpp -o /tmp/test_button && /tmp/test_button
-g++ -std=c++17 -I./src tests/test_battery_math.cpp -o /tmp/test_battery && /tmp/test_battery
+g++ -std=c++17 -I./tests/stubs -I./include -I./src tests/test_button_gesture_tracker.cpp src/app/ButtonGestureTracker.cpp -o tests/.test_button && ./tests/.test_button
+g++ -std=c++17 -I./src tests/test_battery_math.cpp -o tests/.test_battery && ./tests/.test_battery
 ```

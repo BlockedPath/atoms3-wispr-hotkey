@@ -1,5 +1,6 @@
 #include <iostream>
 
+#include "AppConfig.h"
 #include "app/ButtonGestureTracker.h"
 
 namespace {
@@ -8,8 +9,8 @@ using assclets::ButtonGestureTracker;
 using assclets::GestureAction;
 using assclets::GestureMode;
 
-constexpr uint32_t kHoldMs = 250;
-constexpr uint32_t kDoubleTapMs = 400;
+constexpr uint32_t kHoldMs = assclets::config::kHoldMs;
+constexpr uint32_t kDoubleTapMs = assclets::config::kDoubleTapMs;
 
 int failures = 0;
 
