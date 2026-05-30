@@ -90,8 +90,25 @@ small battery badge appears to its left **only when a 9V pack is wired in** (see
 hidden.
 
 > A press must last ~250 ms to count as a hold (vs. a tap) — this is how the
-> firmware tells push-to-talk from a double-tap. Tune `HOLD_MS` / `DTAP_MS` in
-> `src/main.cpp` to taste.
+> firmware tells push-to-talk from a double-tap. Tune `kHoldMs` / `kDoubleTapMs`
+> in `include/AppConfig.h` to taste.
+
+## Project layout
+
+The firmware is split by responsibility so new features can be added without
+turning `loop()` into a large state blob:
+
+| Path | Responsibility |
+|------|----------------|
+| `src/main.cpp` | Arduino `setup()` / `loop()` glue |
+| `src/app/HotkeyController.*` | BLE hotkey state machine and button gestures |
+| `src/hardware/DisplayView.*` | LCD rendering |
+| `src/hardware/BatteryMonitor.*` | Optional 9V ADC battery gauge |
+| `src/hardware/OtaService.*` | Wi-Fi retry + OTA service |
+| `include/AppConfig.h` | Device constants and compile-time flags |
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the boundaries and design
+rules.
 
 ## Optional: 9V battery gauge
 
@@ -106,13 +123,14 @@ divider into an ADC pin. On a breadboard (e.g. the HW-131) this is solderless.
                          └──────────────────────────→ G8 / GPIO8  (AtomS3, ADC1)
 ```
 
-- **Off by default.** Set `#define BATTERY_GAUGE 1` in `src/main.cpp` *after*
-  wiring the divider — otherwise the floating ADC pin shows a meaningless
-  "phantom" %. A USB power bank can't be gauged (regulated 5V, no telemetry), so
-  leave it `0` for power-bank/USB use.
+- **Off by default.** Add `-DASSCLETS_BATTERY_GAUGE=1` to `build_flags` in
+  `platformio.ini` *after* wiring the divider — otherwise the floating ADC pin
+  shows a meaningless "phantom" %. A USB power bank can't be gauged (regulated
+  5V, no telemetry), so leave it disabled for power-bank/USB use.
 - Divider ratio `R2/(R1+R2) = 0.233` keeps a fresh ~9.6V cell at ~2.2V on the
-  pin — safely under the 3.3V ADC limit. `BAT_DIVIDER`, `BAT_FULL_MV`,
-  `BAT_EMPTY_MV` in `src/main.cpp` tune the curve (defaults are alkaline-9V).
+  pin — safely under the 3.3V ADC limit. `kBatteryDivider`, `kBatteryFullMv`,
+  `kBatteryEmptyMv` in `include/AppConfig.h` tune the curve (defaults are
+  alkaline-9V).
 - **G8/GPIO8 is on ADC1 deliberately** — ADC2 is shared with the Wi-Fi radio and
   reads fail while Wi-Fi/OTA is up.
 - ⚠️ **Before connecting GPIO8:** build the divider and measure the midpoint with
@@ -144,5 +162,4 @@ capabilities and constraints.
 
 ## Rename the device
 
-Change the name string in `src/main.cpp`:
-`BleKeyboard bleKeyboard("AtomS3 Hotkey", "M5Stack", 100);`
+Change `kBleDeviceName` in `include/AppConfig.h`.
