@@ -19,6 +19,7 @@ compile_commands.json
 !.github/ISSUE_TEMPLATE/
 !.github/ISSUE_TEMPLATE/*.md
 !.github/pull_request_template.md
+!docs/agents/*.md
 # macOS
 .DS_Store
 
