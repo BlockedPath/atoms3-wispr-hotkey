@@ -11,7 +11,7 @@
 *.bin
 *.elf
 *.map
-
+*.md
 # macOS
 .DS_Store
 
