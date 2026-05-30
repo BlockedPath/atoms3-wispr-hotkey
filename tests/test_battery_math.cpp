@@ -25,6 +25,8 @@ void testBatteryMapping() {
            "full voltage should be 100%");
   expectEq(assclets::mapBatteryMvToPercent(9800, 4500, 6000, 9000), 100,
            "above full voltage should clamp to 100%");
+  expectEq(assclets::mapBatteryMvToPercent(7500, 4500, 9000, 6000), -1,
+           "invalid range should return hidden state");
 }
 
 }  // namespace

@@ -22,6 +22,7 @@ void expect(bool condition, const char* message) {
 
 void testHoldStartsPushToTalk() {
   ButtonGestureTracker tracker;
+  // This intentionally models one continuous hold gesture over time.
   expect(tracker.update(GestureMode::Idle, 0, true, true, false, kHoldMs, kDoubleTapMs) ==
              GestureAction::None,
          "press edge should not immediately start recording");

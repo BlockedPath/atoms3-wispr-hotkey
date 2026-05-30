@@ -10,7 +10,7 @@ inline int mapBatteryMvToPercent(int batteryMv, int presentMv, int emptyMv, int 
   }
 
   if (fullMv <= emptyMv) {
-    return 100;
+    return -1;
   }
 
   const int scaled = (batteryMv - emptyMv) * 100 / (fullMv - emptyMv);
