@@ -3,6 +3,10 @@
 Firmware for turning an **M5Stack AtomS3** into a hardware push-to-talk button
 for [Wispr Flow](https://wisprflow.ai) on macOS.
 
+This is currently **AtomS3-only firmware**. It is not a generic ESP32 project
+yet. Other ESP32 boards need porting for their board target, button/input pin,
+display or no-display behavior, and HID setup.
+
 Hold the AtomS3 screen button and the device holds **Ctrl+Option** over
 Bluetooth LE HID. Release the button and the keys are released. Wispr Flow uses
 that shortcut to record while held, then transcribes into the focused text field.
@@ -13,6 +17,9 @@ that shortcut to record while held, then transcribes into the focused text field
 - USB-C cable for power and first flash.
 - A Mac with Bluetooth and Wispr Flow installed.
 - Python 3 and PlatformIO.
+
+Generic ESP32 boards are not supported by this firmware as-is. The code expects
+the AtomS3 board definition, M5Unified screen button, and 128x128 display.
 
 The AtomS3 does not have a built-in battery. It should stay plugged into USB for
 power unless you add your own external supply.
@@ -60,11 +67,15 @@ Edit `src/secrets.h`:
 #define WIFI_PASS     "your-wifi-password"
 
 #define OTA_HOSTNAME  "atom-hotkey"
-#define OTA_PASSWORD  ""
+#define OTA_PASSWORD  "choose-a-long-random-ota-password"
 ```
 
 `src/secrets.h` is intentionally ignored by Git. Do not commit your Wi-Fi
-password.
+password or OTA password.
+
+`OTA_PASSWORD` must be non-empty. The firmware refuses to compile with an empty
+OTA password because wireless updates can replace firmware on a device paired to
+your Mac as a Bluetooth keyboard.
 
 ## Build And Flash Over USB
 
@@ -137,10 +148,13 @@ is on the same network and the OTA dot on the screen is green.
 The default OTA target is `atom-hotkey.local`, matching `OTA_HOSTNAME` in
 `src/secrets.h` and `upload_port` in `platformio.ini`.
 
+OTA uploads require the password you set in `src/secrets.h`. Keep it private and
+pass the same value to PlatformIO through `ASSCLETS_OTA_PASSWORD`.
+
 Flash over Wi-Fi:
 
 ```bash
-pio run -e atoms3-ota -t upload
+ASSCLETS_OTA_PASSWORD='your-ota-password' pio run -e atoms3-ota -t upload
 ```
 
 If you change `OTA_HOSTNAME`, also update `upload_port` in the `atoms3-ota`
