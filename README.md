@@ -262,3 +262,17 @@ all newer core/library combinations.
 | `src/secrets.h.example` | Template for local Wi-Fi and OTA config |
 
 See `docs/ARCHITECTURE.md` for the internal design rules.
+
+## Host Unit Tests
+
+Two host-side C++ unit tests cover the non-hardware logic paths:
+
+- `tests/test_button_gesture_tracker.cpp` (hold/tap/double-tap/lock transitions)
+- `tests/test_battery_math.cpp` (battery voltage-to-percent mapping and clamping)
+
+Run them with:
+
+```bash
+g++ -std=c++17 -I./src tests/test_button_gesture_tracker.cpp src/app/ButtonGestureTracker.cpp -o /tmp/test_button && /tmp/test_button
+g++ -std=c++17 -I./src tests/test_battery_math.cpp -o /tmp/test_battery && /tmp/test_battery
+```
