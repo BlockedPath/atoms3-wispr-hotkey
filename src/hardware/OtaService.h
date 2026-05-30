@@ -16,10 +16,16 @@ class OtaService {
   bool ready() const {
     return ready_;
   }
+  bool updating() const {
+    return updating_;
+  }
+  bool consumeDisplayActivity();
 
  private:
   DisplayView& display_;
   bool ready_ = false;
+  bool updating_ = false;
+  bool displayActivity_ = false;
   uint32_t lastWifiTryMs_ = 0;
 
   bool setReady(bool ready);

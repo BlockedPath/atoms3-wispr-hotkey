@@ -2,6 +2,8 @@
 
 #include <math.h>
 
+#include "AppConfig.h"
+
 namespace assclets {
 namespace {
 
@@ -10,10 +12,20 @@ constexpr float kTwoPi = 6.28318530718f;
 }  // namespace
 
 void DisplayView::begin() {
+  activeBrightness_ = M5.Display.getBrightness();
   canvas_.setColorDepth(16);
   canvas_.createSprite(M5.Display.width(), M5.Display.height());
   canvas_.setTextWrap(false);
   initPalette();
+}
+
+void DisplayView::setDimmed(bool dimmed) {
+  if (dimmed_ == dimmed) {
+    return;
+  }
+
+  dimmed_ = dimmed;
+  M5.Display.setBrightness(dimmed_ ? config::kDisplayDimBrightness : activeBrightness_);
 }
 
 void DisplayView::initPalette() {

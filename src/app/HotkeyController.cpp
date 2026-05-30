@@ -18,6 +18,7 @@ void HotkeyController::begin() {
   battery_.sample();
   display_.setBatteryPercent(battery_.percent());
   display_.setOtaReady(ota_.ready());
+  markDisplayUsed(millis());
   display_.showDisconnected();
 }
 
@@ -25,31 +26,38 @@ void HotkeyController::update() {
   M5.update();
 
   const uint32_t now = millis();
-  if (ota_.update(now)) {
+  const bool otaReadyChanged = ota_.update(now);
+  if (ota_.consumeDisplayActivity()) {
+    markDisplayUsed(now);
+  }
+  if (otaReadyChanged) {
     redrawStaticState();
   }
   sampleBatteryIfDue(now);
 
   const bool connected = keyboard_.isConnected();
-  handleConnection(connected);
+  handleConnection(connected, now);
 
   if (!connected) {
+    updateDisplayDimming(now);
     delay(20);
     return;
   }
 
   handleButton(now);
   animateRecording(now);
+  updateDisplayDimming(now);
   delay(5);
 }
 
-void HotkeyController::handleConnection(bool connected) {
+void HotkeyController::handleConnection(bool connected, uint32_t now) {
   if (connected && !wasConnected_) {
     enterIdle();
   } else if (!connected && wasConnected_) {
     releaseKeys();
     mode_ = Mode::Idle;
     pendingTap_ = false;
+    markDisplayUsed(now);
     display_.showDisconnected();
   }
 
@@ -58,6 +66,7 @@ void HotkeyController::handleConnection(bool connected) {
 
 void HotkeyController::handleButton(uint32_t now) {
   if (M5.BtnA.wasPressed()) {
+    markDisplayUsed(now);
     pressStartMs_ = now;
   }
 
@@ -66,6 +75,7 @@ void HotkeyController::handleButton(uint32_t now) {
   }
 
   if (M5.BtnA.wasReleased()) {
+    markDisplayUsed(now);
     const uint32_t pressDuration = now - pressStartMs_;
     if (mode_ == Mode::PushToTalk) {
       enterIdle();
@@ -119,10 +129,11 @@ void HotkeyController::sampleBatteryIfDue(uint32_t now) {
 }
 
 void HotkeyController::redrawStaticState() {
-  if (mode_ != Mode::Idle) {
+  if (mode_ != Mode::Idle || ota_.updating()) {
     return;
   }
 
+  markDisplayUsed(millis());
   if (keyboard_.isConnected()) {
     display_.showIdle(lastClipMs_);
   } else {
@@ -130,29 +141,65 @@ void HotkeyController::redrawStaticState() {
   }
 }
 
+void HotkeyController::markDisplayUsed(uint32_t now) {
+  lastDisplayUseMs_ = now;
+  setDisplayDimmed(false);
+}
+
+void HotkeyController::setDisplayDimmed(bool dimmed) {
+  if (displayDimmed_ == dimmed) {
+    return;
+  }
+
+  displayDimmed_ = dimmed;
+  display_.setDimmed(displayDimmed_);
+}
+
+void HotkeyController::updateDisplayDimming(uint32_t now) {
+  if (mode_ != Mode::Idle) {
+    setDisplayDimmed(false);
+    return;
+  }
+
+  if (ota_.updating()) {
+    markDisplayUsed(now);
+    return;
+  }
+
+  if (!displayDimmed_ && now - lastDisplayUseMs_ >= config::kDisplayIdleDimMs) {
+    setDisplayDimmed(true);
+  }
+}
+
 void HotkeyController::enterIdle() {
+  const uint32_t now = millis();
   if (mode_ == Mode::PushToTalk || mode_ == Mode::Locked) {
-    lastClipMs_ = millis() - recordingStartMs_;
+    lastClipMs_ = now - recordingStartMs_;
   }
 
   releaseKeys();
   mode_ = Mode::Idle;
   pendingTap_ = false;
+  markDisplayUsed(now);
   display_.showIdle(lastClipMs_);
 }
 
 void HotkeyController::enterPushToTalk() {
-  recordingStartMs_ = millis();
+  const uint32_t now = millis();
+  recordingStartMs_ = now;
   holdWisprCombo();
   mode_ = Mode::PushToTalk;
+  markDisplayUsed(now);
   display_.showPushToTalk(0);
 }
 
 void HotkeyController::enterLocked() {
-  recordingStartMs_ = millis();
+  const uint32_t now = millis();
+  recordingStartMs_ = now;
   holdWisprCombo();
   mode_ = Mode::Locked;
   pendingTap_ = false;
+  markDisplayUsed(now);
   display_.showLocked(0);
 }
 

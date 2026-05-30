@@ -15,6 +15,7 @@ class DisplayView {
   void setBatteryPercent(int percent) {
     batteryPercent_ = percent;
   }
+  void setDimmed(bool dimmed);
 
   void showDisconnected();
   void showIdle(uint32_t lastClipMs);
@@ -36,6 +37,8 @@ class DisplayView {
   M5Canvas canvas_{&M5.Display};
   Palette colors_{};
   bool otaReady_ = false;
+  bool dimmed_ = false;
+  uint8_t activeBrightness_ = 127;
   int batteryPercent_ = -1;
 
   void initPalette();

@@ -26,12 +26,26 @@ void OtaService::begin() {
   ArduinoOTA.setHostname(OTA_HOSTNAME);
   ArduinoOTA.setPassword(OTA_PASSWORD);
 
-  ArduinoOTA.onStart([this]() { display_.showUpdating(0, 100); });
+  ArduinoOTA.onStart([this]() {
+    updating_ = true;
+    displayActivity_ = true;
+    display_.showUpdating(0, 100);
+  });
   ArduinoOTA.onProgress([this](unsigned int progress, unsigned int total) {
+    updating_ = true;
+    displayActivity_ = true;
     display_.showUpdating(progress, total);
   });
-  ArduinoOTA.onEnd([this]() { display_.showUpdating(100, 100); });
-  ArduinoOTA.onError([this](ota_error_t) { display_.showDisconnected(); });
+  ArduinoOTA.onEnd([this]() {
+    updating_ = false;
+    displayActivity_ = true;
+    display_.showUpdating(100, 100);
+  });
+  ArduinoOTA.onError([this](ota_error_t) {
+    updating_ = false;
+    displayActivity_ = true;
+    display_.showDisconnected();
+  });
 }
 
 bool OtaService::update(uint32_t now) {
@@ -52,6 +66,12 @@ bool OtaService::update(uint32_t now) {
     lastWifiTryMs_ = now;
   }
   return changed;
+}
+
+bool OtaService::consumeDisplayActivity() {
+  const bool activity = displayActivity_;
+  displayActivity_ = false;
+  return activity;
 }
 
 bool OtaService::setReady(bool ready) {

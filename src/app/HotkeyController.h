@@ -30,6 +30,7 @@ class HotkeyController {
   Mode mode_ = Mode::Idle;
   bool wasConnected_ = false;
   bool pendingTap_ = false;
+  bool displayDimmed_ = false;
 
   uint32_t pressStartMs_ = 0;
   uint32_t lastTapMs_ = 0;
@@ -37,12 +38,16 @@ class HotkeyController {
   uint32_t lastClipMs_ = 0;
   uint32_t lastBatterySampleMs_ = 0;
   uint32_t lastFrameMs_ = 0;
+  uint32_t lastDisplayUseMs_ = 0;
 
-  void handleConnection(bool connected);
+  void handleConnection(bool connected, uint32_t now);
   void handleButton(uint32_t now);
   void animateRecording(uint32_t now);
   void sampleBatteryIfDue(uint32_t now);
   void redrawStaticState();
+  void markDisplayUsed(uint32_t now);
+  void setDisplayDimmed(bool dimmed);
+  void updateDisplayDimming(uint32_t now);
 
   void enterIdle();
   void enterPushToTalk();

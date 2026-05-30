@@ -21,6 +21,8 @@ constexpr uint32_t kDoubleTapMs = 400;
 constexpr uint32_t kRecordingFrameMs = 33;
 constexpr uint32_t kBatterySampleMs = 5000;
 constexpr uint32_t kWifiRetryMs = 10000;
+constexpr uint32_t kDisplayIdleDimMs = 60000;
+constexpr uint8_t kDisplayDimBrightness = 24;
 
 constexpr int kBatteryAdcPin = 8;        // G8 / GPIO8 (ADC1_CH7)
 constexpr float kBatteryDivider = 4.3f;  // (R1+R2)/R2 for R1=330k, R2=100k
