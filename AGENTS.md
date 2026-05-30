@@ -36,10 +36,17 @@ OTA firmware is already installed and the device is reachable as
 - `src/app/HotkeyController.*` owns the button gesture state machine, BLE HID
   key presses, connection transitions, and high-level device state.
 - `src/hardware/DisplayView.*` owns all LCD drawing through the off-screen
-  canvas. Keep strings short enough for the 128x128 display.
+  canvas. Limit DisplayView strings to a maximum of 12 characters to
+  guarantee they fit within the 128x128 display at the default font size.
 - `src/hardware/OtaService.*` owns Wi-Fi retry and ArduinoOTA handling. OTA
   must remain best-effort and non-blocking so BLE HID stays responsive.
+  After 5 consecutive Wi-Fi connect failures, suspend the OtaService and
+  disable the Wi-Fi radio entirely to save power and prevent BLE radio
+  interference. Do not attempt infinite reconnections.
 - `src/hardware/BatteryMonitor.*` owns optional ADC sampling for the 9V gauge.
+  If the ADC reading on GPIO8 is fully saturated (4095), assume a hardware
+  fault or overvoltage state. Disable the battery gauge rendering and do not
+  attempt to compute or display battery percentages.
 - `include/AppConfig.h` is where compile-time feature flags and device constants
   belong.
 
@@ -55,9 +62,9 @@ small helper behind `HotkeyController` when adding features.
   `ASSCLETS_BATTERY_GAUGE=1` after the resistor divider is actually wired.
 - Battery gauge input is GPIO8 / ADC1. ADC1 is deliberate because ADC2 conflicts
   with Wi-Fi on ESP32.
-- Before connecting a 9V divider to GPIO8, the midpoint must be measured with a
-  multimeter. It should be about 2.2V from a fresh 9V battery; wiring raw 9V to
-  the pin can destroy the device.
+- Assume the 9V resistor divider is already verified and correctly drops 9V
+  down to ~2.2V at the GPIO8 midpoint. Do not emit code or prompts to
+  measure this; treat GPIO8 as reading 0–2.2V in firmware.
 
 ## Implementation Guidance
 

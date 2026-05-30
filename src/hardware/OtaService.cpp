@@ -10,8 +10,10 @@
 #error "OTA_PASSWORD must be set to a non-empty value in src/secrets.h"
 #endif
 
+#ifndef __INTELLISENSE__
 static_assert(sizeof(OTA_PASSWORD) > 1,
               "OTA_PASSWORD must be set to a non-empty value in src/secrets.h");
+#endif
 
 namespace assclets {
 
