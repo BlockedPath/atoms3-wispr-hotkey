@@ -4,6 +4,7 @@
 #include <BleKeyboard.h>
 
 #include "AppConfig.h"
+#include "app/ButtonGestureTracker.h"
 #include "hardware/BatteryMonitor.h"
 #include "hardware/DisplayView.h"
 #include "hardware/OtaService.h"
@@ -29,14 +30,12 @@ class HotkeyController {
 
   Mode mode_ = Mode::Idle;
   bool wasConnected_ = false;
-  bool pendingTap_ = false;
 
-  uint32_t pressStartMs_ = 0;
-  uint32_t lastTapMs_ = 0;
   uint32_t recordingStartMs_ = 0;
   uint32_t lastClipMs_ = 0;
   uint32_t lastBatterySampleMs_ = 0;
   uint32_t lastFrameMs_ = 0;
+  ButtonGestureTracker gesture_{};
 
   void handleConnection(bool connected);
   void handleButton(uint32_t now);

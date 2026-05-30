@@ -1,6 +1,7 @@
 #include "hardware/BatteryMonitor.h"
 
 #include "AppConfig.h"
+#include "hardware/BatteryMath.h"
 
 namespace assclets {
 
@@ -18,11 +19,8 @@ bool BatteryMonitor::sample() {
   }
 
   const int batteryMv = static_cast<int>((sum / 8) * config::kBatteryDivider);
-  const int nextPercent = batteryMv < config::kBatteryPresentMv
-                              ? -1
-                              : constrain((batteryMv - config::kBatteryEmptyMv) * 100 /
-                                              (config::kBatteryFullMv - config::kBatteryEmptyMv),
-                                          0, 100);
+  const int nextPercent = mapBatteryMvToPercent(
+      batteryMv, config::kBatteryPresentMv, config::kBatteryEmptyMv, config::kBatteryFullMv);
 #endif
 
   if (nextPercent == percent_) {

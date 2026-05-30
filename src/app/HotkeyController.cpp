@@ -49,7 +49,7 @@ void HotkeyController::handleConnection(bool connected) {
   } else if (!connected && wasConnected_) {
     releaseKeys();
     mode_ = Mode::Idle;
-    pendingTap_ = false;
+    gesture_.clearPendingTap();
     display_.showDisconnected();
   }
 
@@ -57,32 +57,35 @@ void HotkeyController::handleConnection(bool connected) {
 }
 
 void HotkeyController::handleButton(uint32_t now) {
-  if (M5.BtnA.wasPressed()) {
-    pressStartMs_ = now;
+  GestureMode gestureMode = GestureMode::Idle;
+  switch (mode_) {
+    case Mode::Idle:
+      gestureMode = GestureMode::Idle;
+      break;
+    case Mode::PushToTalk:
+      gestureMode = GestureMode::PushToTalk;
+      break;
+    case Mode::Locked:
+      gestureMode = GestureMode::Locked;
+      break;
   }
 
-  if (mode_ == Mode::Idle && M5.BtnA.isPressed() && now - pressStartMs_ >= config::kHoldMs) {
-    enterPushToTalk();
-  }
+  const GestureAction action =
+      gesture_.update(gestureMode, now, M5.BtnA.wasPressed(), M5.BtnA.isPressed(),
+                      M5.BtnA.wasReleased(), config::kHoldMs, config::kDoubleTapMs);
 
-  if (M5.BtnA.wasReleased()) {
-    const uint32_t pressDuration = now - pressStartMs_;
-    if (mode_ == Mode::PushToTalk) {
+  switch (action) {
+    case GestureAction::EnterPushToTalk:
+      enterPushToTalk();
+      break;
+    case GestureAction::EnterLocked:
+      enterLocked();
+      break;
+    case GestureAction::EnterIdle:
       enterIdle();
-    } else if (mode_ == Mode::Locked) {
-      enterIdle();
-    } else if (pressDuration < config::kHoldMs) {
-      if (pendingTap_ && now - lastTapMs_ <= config::kDoubleTapMs) {
-        enterLocked();
-      } else {
-        pendingTap_ = true;
-        lastTapMs_ = now;
-      }
-    }
-  }
-
-  if (pendingTap_ && now - lastTapMs_ > config::kDoubleTapMs) {
-    pendingTap_ = false;
+      break;
+    case GestureAction::None:
+      break;
   }
 }
 
@@ -137,7 +140,7 @@ void HotkeyController::enterIdle() {
 
   releaseKeys();
   mode_ = Mode::Idle;
-  pendingTap_ = false;
+  gesture_.clearPendingTap();
   display_.showIdle(lastClipMs_);
 }
 
@@ -152,7 +155,7 @@ void HotkeyController::enterLocked() {
   recordingStartMs_ = millis();
   holdWisprCombo();
   mode_ = Mode::Locked;
-  pendingTap_ = false;
+  gesture_.clearPendingTap();
   display_.showLocked(0);
 }
 
