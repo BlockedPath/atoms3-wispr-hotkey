@@ -17,7 +17,9 @@ constexpr const char* kBleManufacturer = "M5Stack";
 constexpr uint8_t kBleBatteryLevel = 100;
 
 constexpr uint32_t kHoldMs = 250;
-constexpr uint32_t kDoubleTapMs = 400;
+constexpr uint32_t kTapSequenceMs = 400;
+constexpr uint8_t kReturnTapCount = 3;
+constexpr uint32_t kReturnConfirmMs = 650;
 constexpr uint32_t kRecordingFrameMs = 33;
 constexpr uint32_t kBatterySampleMs = 5000;
 constexpr uint32_t kWifiRetryMs = 10000;

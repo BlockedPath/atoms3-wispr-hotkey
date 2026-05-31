@@ -21,6 +21,7 @@ class DisplayView {
   void showIdle(uint32_t lastClipMs);
   void showPushToTalk(uint32_t elapsedMs);
   void showLocked(uint32_t elapsedMs);
+  void showReturnSent();
   void showUpdating(unsigned int progress, unsigned int total);
 
  private:

@@ -58,6 +58,10 @@ void DisplayView::showLocked(uint32_t elapsedMs) {
   renderScreen(title.c_str(), "tap to stop", colors_.red, colors_.bgRecording, 2, pulseRadius());
 }
 
+void DisplayView::showReturnSent() {
+  renderScreen("RETURN", "sent", colors_.blue, colors_.bg, 0, 0);
+}
+
 void DisplayView::showUpdating(unsigned int progress, unsigned int total) {
   const int cx = canvas_.width() / 2;
   const int pct = total ? static_cast<int>((progress * 100UL) / total) : 0;

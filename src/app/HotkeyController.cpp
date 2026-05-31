@@ -45,6 +45,8 @@ void HotkeyController::update() {
   }
 
   handleButton(now);
+  finishTapSequence(now);
+  finishReturnConfirmation(now);
   animateRecording(now);
   updateDisplayDimming(now);
   delay(5);
@@ -56,7 +58,8 @@ void HotkeyController::handleConnection(bool connected, uint32_t now) {
   } else if (!connected && wasConnected_) {
     releaseKeys();
     mode_ = Mode::Idle;
-    pendingTap_ = false;
+    resetTapSequence();
+    returnConfirming_ = false;
     markDisplayUsed(now);
     display_.showDisconnected();
   }
@@ -67,10 +70,14 @@ void HotkeyController::handleConnection(bool connected, uint32_t now) {
 void HotkeyController::handleButton(uint32_t now) {
   if (M5.BtnA.wasPressed()) {
     markDisplayUsed(now);
+    if (pendingTap_ && now - lastTapMs_ > config::kTapSequenceMs) {
+      resetTapSequence();
+    }
     pressStartMs_ = now;
   }
 
   if (mode_ == Mode::Idle && M5.BtnA.isPressed() && now - pressStartMs_ >= config::kHoldMs) {
+    resetTapSequence();
     enterPushToTalk();
   }
 
@@ -82,18 +89,49 @@ void HotkeyController::handleButton(uint32_t now) {
     } else if (mode_ == Mode::Locked) {
       enterIdle();
     } else if (pressDuration < config::kHoldMs) {
-      if (pendingTap_ && now - lastTapMs_ <= config::kDoubleTapMs) {
-        enterLocked();
-      } else {
-        pendingTap_ = true;
-        lastTapMs_ = now;
-      }
+      recordShortTap(now);
     }
   }
+}
 
-  if (pendingTap_ && now - lastTapMs_ > config::kDoubleTapMs) {
-    pendingTap_ = false;
+void HotkeyController::recordShortTap(uint32_t now) {
+  if (!pendingTap_ || now - lastTapMs_ > config::kTapSequenceMs) {
+    tapCount_ = 0;
   }
+
+  pendingTap_ = true;
+  lastTapMs_ = now;
+  ++tapCount_;
+
+  if (tapCount_ >= config::kReturnTapCount) {
+    sendReturnKey();
+  }
+}
+
+void HotkeyController::finishTapSequence(uint32_t now) {
+  if (!pendingTap_ || M5.BtnA.isPressed() || now - lastTapMs_ <= config::kTapSequenceMs) {
+    return;
+  }
+
+  const uint8_t completedTaps = tapCount_;
+  resetTapSequence();
+  if (completedTaps == 2) {
+    enterLocked();
+  }
+}
+
+void HotkeyController::resetTapSequence() {
+  pendingTap_ = false;
+  tapCount_ = 0;
+}
+
+void HotkeyController::finishReturnConfirmation(uint32_t now) {
+  if (!returnConfirming_ || now - returnSentMs_ < config::kReturnConfirmMs) {
+    return;
+  }
+
+  returnConfirming_ = false;
+  redrawStaticState();
 }
 
 void HotkeyController::animateRecording(uint32_t now) {
@@ -129,7 +167,7 @@ void HotkeyController::sampleBatteryIfDue(uint32_t now) {
 }
 
 void HotkeyController::redrawStaticState() {
-  if (mode_ != Mode::Idle || ota_.updating()) {
+  if (mode_ != Mode::Idle || ota_.updating() || returnConfirming_) {
     return;
   }
 
@@ -179,7 +217,8 @@ void HotkeyController::enterIdle() {
 
   releaseKeys();
   mode_ = Mode::Idle;
-  pendingTap_ = false;
+  resetTapSequence();
+  returnConfirming_ = false;
   markDisplayUsed(now);
   display_.showIdle(lastClipMs_);
 }
@@ -187,6 +226,8 @@ void HotkeyController::enterIdle() {
 void HotkeyController::enterPushToTalk() {
   const uint32_t now = millis();
   recordingStartMs_ = now;
+  resetTapSequence();
+  returnConfirming_ = false;
   holdWisprCombo();
   mode_ = Mode::PushToTalk;
   markDisplayUsed(now);
@@ -196,9 +237,10 @@ void HotkeyController::enterPushToTalk() {
 void HotkeyController::enterLocked() {
   const uint32_t now = millis();
   recordingStartMs_ = now;
+  returnConfirming_ = false;
   holdWisprCombo();
   mode_ = Mode::Locked;
-  pendingTap_ = false;
+  resetTapSequence();
   markDisplayUsed(now);
   display_.showLocked(0);
 }
@@ -206,6 +248,17 @@ void HotkeyController::enterLocked() {
 void HotkeyController::holdWisprCombo() {
   keyboard_.press(KEY_LEFT_CTRL);
   keyboard_.press(KEY_LEFT_ALT);
+}
+
+void HotkeyController::sendReturnKey() {
+  const uint32_t now = millis();
+  resetTapSequence();
+  releaseKeys();
+  keyboard_.write(KEY_RETURN);
+  returnSentMs_ = now;
+  returnConfirming_ = true;
+  markDisplayUsed(now);
+  display_.showReturnSent();
 }
 
 void HotkeyController::releaseKeys() {

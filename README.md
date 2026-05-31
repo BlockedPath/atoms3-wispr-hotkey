@@ -10,6 +10,8 @@ display or no-display behavior, and HID setup.
 Hold the AtomS3 screen button and the device holds **Ctrl+Option** over
 Bluetooth LE HID. Release the button and the keys are released. Wispr Flow uses
 that shortcut to record while held, then transcribes into the focused text field.
+Triple-tap the button to send **Return** over Bluetooth, which can submit the
+focused message on macOS after dictation finishes.
 
 ## What You Need
 
@@ -126,6 +128,7 @@ left Control plus left Option.
 | Press and hold | Talk while held |
 | Release after hold | Stop recording and transcribe |
 | Double-tap | Lock recording on for hands-free dictation |
+| Triple-tap | Send Return to submit the focused message |
 | Tap while locked | Stop locked recording and transcribe |
 
 Screen states:
@@ -136,6 +139,7 @@ Screen states:
 | `READY` | Connected and idle |
 | `M:SS` with `listening` | Recording while held |
 | `M:SS` with `tap to stop` | Locked recording is active |
+| `RETURN` with `sent` | Return key was sent |
 | `last M:SS` | Length of the most recent recording |
 
 Wispr may ignore very short clips. Hold for about one second or longer.
@@ -168,7 +172,9 @@ Common settings live in `include/AppConfig.h`:
 | --- | --- |
 | `kBleDeviceName` | Bluetooth device name shown in macOS |
 | `kHoldMs` | Press duration needed before hold-to-talk starts |
-| `kDoubleTapMs` | Max time between taps for locked recording |
+| `kTapSequenceMs` | Max time between taps for double/triple gestures |
+| `kReturnTapCount` | Number of taps that sends Return |
+| `kReturnConfirmMs` | How long the Return confirmation stays visible |
 | `kRecordingFrameMs` | Display animation update interval |
 | `kWifiRetryMs` | Wi-Fi reconnect retry interval |
 

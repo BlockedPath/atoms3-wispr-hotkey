@@ -30,10 +30,13 @@ class HotkeyController {
   Mode mode_ = Mode::Idle;
   bool wasConnected_ = false;
   bool pendingTap_ = false;
+  bool returnConfirming_ = false;
   bool displayDimmed_ = false;
+  uint8_t tapCount_ = 0;
 
   uint32_t pressStartMs_ = 0;
   uint32_t lastTapMs_ = 0;
+  uint32_t returnSentMs_ = 0;
   uint32_t recordingStartMs_ = 0;
   uint32_t lastClipMs_ = 0;
   uint32_t lastBatterySampleMs_ = 0;
@@ -42,6 +45,10 @@ class HotkeyController {
 
   void handleConnection(bool connected, uint32_t now);
   void handleButton(uint32_t now);
+  void recordShortTap(uint32_t now);
+  void finishTapSequence(uint32_t now);
+  void resetTapSequence();
+  void finishReturnConfirmation(uint32_t now);
   void animateRecording(uint32_t now);
   void sampleBatteryIfDue(uint32_t now);
   void redrawStaticState();
@@ -54,6 +61,7 @@ class HotkeyController {
   void enterLocked();
 
   void holdWisprCombo();
+  void sendReturnKey();
   void releaseKeys();
 };
 
